@@ -1,0 +1,24 @@
+# Session 09 · Agent Lab
+
+이 레포는 LLM이 도구를 선택하고, 우리 코드가 도구를 실행한 뒤, 결과를 다시 LLM에 전달하는 흐름을 보여주는 실습 템플릿입니다.
+
+## 수정 규칙
+
+- `src/agent/runAgent.ts`의 도구 호출 루프와 `call_id` ↔ `function_call_output` 연결을 바꾸지 마세요.
+- 참가자 도구는 `src/tools/`에 추가하고 `runAgent.ts`에서 명시적으로 등록하세요.
+- 모든 도구 호출은 실행 로그에 남기고, 인자와 결과에서 API 키·개인정보를 기록하지 마세요.
+- 새로운 DB 접근은 `src/tools/`의 서버 전용 함수에서만 수행하세요.
+- OpenAI와 Supabase 비밀값은 서버 환경변수로만 읽고 `NEXT_PUBLIC_` 접두어를 붙이지 마세요. Supabase URL과 publishable key만 공개 가능한 값입니다.
+- DB 테이블을 바꿀 때 `supabase/schema.sql`과 `supabase/seed.sql`을 함께 갱신하세요.
+- 사용자가 요청하지 않은 외부 API 쓰기, 배포, 스키마 적용을 실행하지 마세요.
+
+## 파일 위치
+
+- `src/agent/`: 최대 단계 수를 포함한 에이전트 실행 루프
+- `src/tools/`: `search_ideas`, `get_market_info`, `save_report`
+- `src/config/`: 모델 및 도구 설명
+- `src/app/api/agent/route.ts`: 요청 검증과 HTTP 응답
+- `supabase/`: 데이터베이스 구조와 데모 시드
+- `scripts/check-env.mjs`: 필요한 환경변수의 존재 확인
+
+기본 데모 순서는 `search_ideas` → `get_market_info` → `save_report`입니다. 최대 실행 횟수는 4회이며 루프를 늘리기 전에 비용과 종료 조건을 확인하세요.
