@@ -428,6 +428,29 @@ h1 em {
   line-height: 1.8;
   white-space: pre-wrap;
 }
+.result-box ul {
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.approval-actions button {
+  padding: 10px 14px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: white;
+  color: var(--green);
+}
+.approval-actions button:first-child {
+  background: var(--green);
+  color: white;
+}
 .error-box {
   margin-top: 16px;
   padding: 15px 17px;

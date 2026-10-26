@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { DEMO_PROMPT, MAX_PROMPT_LENGTH, MAX_STEPS } from "@/lib/shared";
-import type { AgentRunResult, AgentStep } from "@/lib/types";
+import type { AgentRunResult, AgentStep, PendingReport } from "@/lib/types";
 
 type RunState = "idle" | "running" | "done" | "error";
 
@@ -13,6 +13,32 @@ export default function AgentDemo() {
   const [reply, setReply] = useState("");
   const [error, setError] = useState("");
   const [reportSaved, setReportSaved] = useState(false);
+  const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "cancelled" | "failed">("idle");
+  const [saveMessage, setSaveMessage] = useState("");
+
+  async function confirmSave(approved: boolean) {
+    if (!pendingReport || saveState !== "idle") return;
+    setSaveState("saving");
+    try {
+      const response = await fetch("/api/agent/confirm", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: pendingReport.token, approved }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "저장 확인에 실패했습니다.");
+      setReportSaved(Boolean(result.saved));
+      setSaveState(result.saved ? "saved" : "cancelled");
+      setSaveMessage(result.message);
+      setSteps((previous) => [...previous, {
+        name: "save_report", label: "저장 확인", input: approved ? "y" : "n",
+        output: result.message, status: "done",
+      }]);
+    } catch (cause) {
+      setSaveState("failed");
+      setSaveMessage(cause instanceof Error ? cause.message : "저장 확인에 실패했습니다.");
+    }
+  }
 
   async function run(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,6 +48,9 @@ export default function AgentDemo() {
     setReply("");
     setError("");
     setReportSaved(false);
+    setPendingReport(null);
+    setSaveState("idle");
+    setSaveMessage("");
     try {
       const response = await fetch("/api/agent", {
         method: "POST",
@@ -38,6 +67,7 @@ export default function AgentDemo() {
         throw new Error("에이전트 응답이 비어 있습니다.");
       setReply(data.reply);
       setReportSaved(Boolean(data.reportSaved));
+      setPendingReport(data.pendingReport ?? null);
       setState("done");
     } catch (cause) {
       setError(
@@ -64,8 +94,8 @@ export default function AgentDemo() {
         <p className="lede">
           AI가 도구를 고르면, 개발자는 코드를 실행하고 AI에 결과를 전송하는
           과정을 반복합니다.
-          <br className="desktop-break" /> 행사 샘플 검색 도구 하나로
-          조사 결과와 조언을 확인해 보세요.
+          <br className="desktop-break" /> 행사 검색과 상세 조회 후
+          기획 조언을 확인하고 저장 여부를 선택하세요.
         </p>
       </section>
 
@@ -79,6 +109,7 @@ export default function AgentDemo() {
               MAX_STEPS <b>{MAX_STEPS}</b>
             </span>
           </div>
+          <p>검색·상세 자료는 가상 행사 샘플입니다. 실제 행사 조사 결과가 아닙니다.</p>
           <form onSubmit={run}>
             <label htmlFor="prompt">에이전트에 목표를 입력하세요</label>
             <textarea
@@ -87,7 +118,7 @@ export default function AgentDemo() {
               maxLength={MAX_PROMPT_LENGTH}
               onChange={(e) => setPrompt(e.target.value)}
               rows={3}
-              disabled={state === "running"}
+              disabled={state === "running" || saveState === "saving"}
             />
             <div className="form-foot">
               <span>
@@ -95,7 +126,7 @@ export default function AgentDemo() {
               </span>
               <button
                 type="submit"
-                disabled={state === "running" || !prompt.trim()}
+                disabled={state === "running" || saveState === "saving" || !prompt.trim()}
               >
                 {state === "running" ? (
                   <>
@@ -180,6 +211,20 @@ export default function AgentDemo() {
                 최대 단계 제한과 OpenAI 환경 설정을 확인해 주세요.
               </small>
             </div>
+          )}
+          {pendingReport && (
+            <section className="result-box" aria-label="리포트 저장 확인">
+              <h3>저장할까요? y/n</h3>
+              <p>아래 내용만 Supabase에 새로 저장합니다. 원래 요청 문장은 저장하지 않습니다. 확인은 10분 후 만료됩니다.</p>
+              <h4>{pendingReport.draft.title}</h4>
+              <p>{pendingReport.draft.summary}</p>
+              <ul>{pendingReport.draft.findings.map((finding, index) => <li key={index}>{finding}</li>)}</ul>
+              <div className="approval-actions">
+                <button type="button" disabled={saveState !== "idle"} onClick={() => confirmSave(true)}>y · 저장</button>
+                <button type="button" disabled={saveState !== "idle"} onClick={() => confirmSave(false)}>n · 저장하지 않기</button>
+              </div>
+              <p role="status">{saveState === "saving" ? "선택 처리 중…" : saveMessage}</p>
+            </section>
           )}
           {reply && (
             <div className="result-box">
