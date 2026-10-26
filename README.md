@@ -3,8 +3,8 @@
 사용자의 목표에 따라 에이전트가 도구를 고르고, 서버 코드가 직접 실행하고, 결과를 다시 모델에 전달하는 단일 플로우
 
 ```text
-입력: AI 반려동물 앱 아이디어를 검증해줘
-search_ideas → get_market_info → save_report → 최종 요약
+입력: 서울에서 대학생 AI 해커톤을 기획하고 있어. 유사 샘플을 찾고 조언해줘.
+search_events → 도구 결과를 모델에 전달 → 최종 조언
 ```
 
 ## 내 에이전트의 목표와 범위
@@ -19,7 +19,7 @@ search_ideas → get_market_info → save_report → 최종 요약
 
 ## 스텝 2. 도구 설계 검토 프롬프트
 
-아래는 행사 에이전트의 도구 설계 초안을 검토하기 위한 프롬프트입니다. 현재 구현은 기존 앱 아이디어 데모이며, 아래 도구는 아직 구현하지 않았습니다. 검토 후 최종 설계는 참가자가 결정합니다.
+아래는 행사 에이전트의 도구 설계 초안을 검토하기 위한 프롬프트입니다. 스텝 4에서는 search_events만 로컬 가상 샘플로 구현했습니다. 상세 조회와 저장은 아직 구현하지 않았습니다. 검토 후 최종 설계는 참가자가 결정합니다.
 
 ```markdown
 내가 만들려는 에이전트는 행사 아이디어를 입력받아 유사 행사 레퍼런스를 조사하고 기획 조언을 제공하는 에이전트야.
@@ -59,7 +59,7 @@ search_ideas → get_market_info → save_report → 최종 요약
 1. `.env.example`을 `.env.local`로 복사하고 OpenAI 키·모델, Supabase URL·publishable key를 입력합니다.
 2. Supabase SQL Editor에서 `supabase/schema.sql`을 실행한 뒤 `supabase/seed.sql`을 실행합니다.
 3. `npm install` 후 `npm run check:env`, `npm run dev`를 실행합니다.
-4. 화면의 샘플 요청을 실행하고 우측 로그와 Supabase의 `agent_reports` 테이블을 확인합니다.
+4. 화면의 행사 샘플 요청을 실행하고 우측 로그와 최종 조언을 확인합니다. 스텝 4에서는 DB에 저장하지 않습니다.
 
 환경 점검 스크립트는 환경변수 확인 후 OpenAI 최소 호출과 Supabase의 기존 `ideas` 테이블 읽기를 수행합니다. OpenAI 호출에는 소액 비용이 발생할 수 있습니다. 비밀값과 행 내용은 출력하지 않으며 DB 쓰기는 하지 않습니다. 세 검사 모두 OK여야 연결 확인이 완료됩니다. Supabase publishable key는 브라우저에 노출 가능한 키이며, 두 자료 테이블은 RLS 읽기 정책, 리포트 테이블은 삽입 정책으로 제한합니다. 서비스 롤 키는 사용하지 않습니다.
 
@@ -69,14 +69,36 @@ search_ideas → get_market_info → save_report → 최종 요약
 - [CLAUDE.md](CLAUDE.md): 최대 단계 수, 도구 분리, 쓰기 전 사람 확인, 출처와 개발 규칙.
 - `npm run check:env`: 환경변수, OpenAI 호출, Supabase 조회 확인.
 
-행사 도구와 저장 확인은 아직 설계 단계입니다. 현재 앱의 실행 루프는 기존 데모를 유지합니다. 두 문서의 Git 커밋과 연결 검사 통과 여부는 각각 확인해야 합니다.
+상세 조회와 저장 확인은 아직 설계 단계입니다. 기존 루프 뼈대와 call_id 연결은 유지합니다. 두 문서의 Git 커밋과 연결 검사 통과 여부는 각각 확인해야 합니다.
+
+## 스텝 4. 도구 하나와 최소 루프
+
+현재 등록된 도구는 읽기 전용 `search_events` 하나입니다. `src/tools/searchEvents.ts`의 가상 행사 3개를 검색합니다. 실제 행사 DB·웹 검색이 아니며 출처도 가상 샘플 파일을 가리킵니다. 향후 행사 DB 조회로 교체할 예정입니다.
+
+기본 최대 단계는 2회입니다. 첫 번째 모델 응답으로 도구를 호출하고 두 번째 응답으로 최종 조언을 받습니다. 추가 호출을 허용하지 않아 비용과 종료 조건을 단순하게 유지합니다. 서버 환경변수 `AGENT_MAX_STEPS=1`로 실행하면 도구 실행 후 최대 단계 오류로 종료됩니다. 서버 설정은 1 또는 2만 허용하며 화면의 단계 표시는 기본값입니다.
+
+```bash
+npm run check:loop
+```
+
+실제 OpenAI 호출을 사용하는 유료 연결 검사입니다. 기존 개발 서버와 `.env.local`을 바꾸지 않고 다음을 검증합니다.
+
+- `max_steps=2`: 도구 1회 → 결과와 출처를 반영한 최종 답변, 저장 없음.
+- `max_steps=1`: 도구 1회 실행 후 최대 단계 오류로 종료.
+
+검증 시 두 경우 모두 통과했습니다. 터미널 로그 예시는 다음과 같습니다. 자유 입력 인자는 개인정보·API 키 노출 방지를 위해 숨깁니다.
+
+```text
+[step 0] search_events({"arguments":"[비공개]"})
+[step 0] 도구 완료: 1개 가상 행사 샘플을 찾았습니다.
+```
 
 ## 레포 구조
 
 ```text
 src/
   agent/runAgent.ts       # Responses API 도구 호출 루프와 max_steps
-  tools/                  # 검색, 시장 자료 조회, 리포트 저장
+  tools/                  # 행사 샘플 검색 + 기존 미등록 데모 도구
   config/demo.ts          # 모델과 에이전트 지침
   lib/                    # Supabase 클라이언트와 공유 타입
   app/api/agent/route.ts  # 입력 검증과 API 오류 처리
@@ -91,4 +113,4 @@ AGENTS.md                 # 에이전트 도구 공통 실습 규칙
 
 ## 실습 확장
 
-새 기능은 `src/tools/`에 서버 함수와 JSON Schema를 추가하고, `src/agent/runAgent.ts`의 실행 맵에 등록합니다. 기존 루프의 대화 기록과 `call_id` 연결은 그대로 유지합니다. 실행 횟수는 `src/lib/shared.ts`의 `MAX_STEPS`에서 조절합니다.
+새 기능은 `src/tools/`에 서버 함수와 JSON Schema를 추가하고, `src/agent/runAgent.ts`의 실행 맵에 등록합니다. 기존 루프의 대화 기록과 `call_id` 연결은 그대로 유지합니다. 기본 최대 단계는 `src/lib/shared.ts`의 `MAX_STEPS = 2`이며, 서버의 `AGENT_MAX_STEPS`로 1~2회 범위에서 검증합니다.

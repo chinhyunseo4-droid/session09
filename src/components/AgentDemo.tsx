@@ -64,8 +64,8 @@ export default function AgentDemo() {
         <p className="lede">
           AI가 도구를 고르면, 개발자는 코드를 실행하고 AI에 결과를 전송하는
           과정을 반복합니다.
-          <br className="desktop-break" /> 목표 달성을 위해 에이전트가 여러
-          도구를 조합하는 과정을 확인해 보세요.
+          <br className="desktop-break" /> 행사 샘플 검색 도구 하나로
+          조사 결과와 조언을 확인해 보세요.
         </p>
       </section>
 
@@ -73,7 +73,7 @@ export default function AgentDemo() {
         <div className="run-card">
           <div className="card-heading">
             <div>
-              <h2>예제: 아이디어 검증 요청하기</h2>
+              <h2>예제: 행사 레퍼런스 찾기</h2>
             </div>
             <span className="step-limit">
               MAX_STEPS <b>{MAX_STEPS}</b>
@@ -177,7 +177,7 @@ export default function AgentDemo() {
               <strong>실행이 멈췄어요</strong>
               <p>{error}</p>
               <small>
-                시드 SQL 적용 여부와 .env.local 설정을 확인해 주세요.
+                최대 단계 제한과 OpenAI 환경 설정을 확인해 주세요.
               </small>
             </div>
           )}

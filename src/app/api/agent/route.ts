@@ -41,9 +41,6 @@ export async function POST(request: Request) {
   if (typeof prompt !== "string" || !prompt.trim() || prompt.length > MAX_PROMPT_LENGTH) {
     return Response.json({ error: `요청은 1~${MAX_PROMPT_LENGTH}자여야 합니다.` }, { status: 400 });
   }
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
-    return Response.json({ error: "Supabase 환경변수를 .env.local에 설정해 주세요." }, { status: 503 });
-  }
 
   try {
     return Response.json(await runAgent(prompt.trim()));

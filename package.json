@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "check:env": "node --conditions=react-server scripts/check-env.mjs"
+    "check:env": "node --conditions=react-server scripts/check-env.mjs",
+    "check:loop": "node scripts/check-minimal-loop.mjs"
   },
-  "engines": { "node": ">=20.9.0" },
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
     "next": "^16.0.0",

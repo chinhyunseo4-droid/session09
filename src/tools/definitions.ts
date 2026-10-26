@@ -1,43 +1,20 @@
 import type OpenAI from "openai";
 
+// 스텝 4: 모델에 공개하는 도구는 읽기 도구 하나뿐이다.
 export const toolDefinitions: OpenAI.Responses.FunctionTool[] = [
   {
     type: "function",
-    name: "search_ideas",
-    description: "아이디어 테이블에서 요청과 관련된 앱 아이디어를 검색합니다. 첫 번째로 호출하세요.",
-    strict: true,
-    parameters: {
-      type: "object",
-      properties: { query: { type: "string", description: "검색할 앱 분야나 키워드" } },
-      required: ["query"],
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "get_market_info",
-    description: "시드 데이터에 포함된 시장 참고자료를 조회합니다. search_ideas 다음에 호출하세요.",
-    strict: true,
-    parameters: {
-      type: "object",
-      properties: { category: { type: "string", description: "시장 자료를 찾을 카테고리" } },
-      required: ["category"],
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "save_report",
-    description: "검색과 시장 자료를 바탕으로 검증 요약을 Supabase에 저장합니다. 마지막 도구로 호출하세요.",
+    name: "search_events",
+    description: "행사 기획 요청의 유사 사례를 찾을 때 로컬 가상 행사 샘플을 검색한다. 실제 행사 DB나 웹 검색이 아니다. 읽기 전용이며 결과에 출처가 포함된다.",
     strict: true,
     parameters: {
       type: "object",
       properties: {
-        title: { type: "string" },
-        summary: { type: "string" },
-        findings: { type: "array", items: { type: "string" } },
+        keyword: { type: "string", description: "행사 분야 일반 키워드, 1~120자. 개인정보·기밀 제외." },
+        region: { type: ["string", "null"], description: "지역, 1~80자. 제한이 없으면 null." },
+        limit: { type: "integer", minimum: 1, maximum: 10, description: "최대 결과 수. 보통 5." },
       },
-      required: ["title", "summary", "findings"],
+      required: ["keyword", "region", "limit"],
       additionalProperties: false,
     },
   },

@@ -1,12 +1,9 @@
 import "server-only";
 import OpenAI from "openai";
-import { AGENT_INSTRUCTIONS, MODEL } from "@/config/demo";
-import { MAX_STEPS } from "@/lib/shared";
+import { AGENT_INSTRUCTIONS, MODEL, AGENT_MAX_STEPS as MAX_STEPS } from "@/config/demo";
 import type { AgentRunResult, AgentStep, ToolContext } from "@/lib/types";
 import { toolDefinitions } from "@/tools/definitions";
-import { getMarketInfo } from "@/tools/getMarketInfo";
-import { saveReport } from "@/tools/saveReport";
-import { searchIdeas } from "@/tools/searchIdeas";
+import { searchEvents } from "@/tools/searchEvents";
 
 export class AgentRunError extends Error {
   constructor(message: string, public readonly steps: AgentStep[]) {
@@ -38,35 +35,19 @@ async function executeTool(
     throw new Error("도구 인자를 JSON으로 읽지 못했습니다.");
   }
 
-  if (name === "search_ideas") {
-    const query = readString(args, "query", 120);
-    const result = await searchIdeas(query);
+  if (name === "search_events") {
+    const keyword = readString(args, "keyword", 120);
+    const region = (args as { region?: unknown }).region;
+    const limit = (args as { limit?: unknown }).limit;
+    if (region !== null && (typeof region !== "string" || !region.trim() || region.length > 80)) {
+      throw new Error("region은 null 또는 1~80자 텍스트여야 합니다.");
+    }
+    if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 10) {
+      throw new Error("limit은 1~10의 정수여야 합니다.");
+    }
+    const result = await searchEvents({ keyword, region, limit });
     context.hasSearchedIdeas = true;
-    return { value: result, input: query, output: `${result.count}개 아이디어를 찾았습니다.` };
-  }
-
-  if (name === "get_market_info") {
-    if (!context.hasSearchedIdeas) throw new Error("먼저 search_ideas를 호출하세요.");
-    const category = readString(args, "category", 80);
-    const result = await getMarketInfo(category);
-    context.hasMarketInfo = true;
-    return { value: result, input: category, output: `${result.count}개 시드 시장 자료를 찾았습니다.` };
-  }
-
-  if (name === "save_report") {
-    if (!context.hasSearchedIdeas || !context.hasMarketInfo) {
-      throw new Error("search_ideas와 get_market_info를 먼저 실행하세요.");
-    }
-    const title = readString(args, "title", 120);
-    const summary = readString(args, "summary", 1000);
-    const rawFindings = (args as { findings?: unknown }).findings;
-    if (!Array.isArray(rawFindings) || rawFindings.length < 1 || rawFindings.length > 5
-      || rawFindings.some((item) => typeof item !== "string" || !item.trim() || item.length > 240)) {
-      throw new Error("findings는 1~5개의 240자 이내 문장이어야 합니다.");
-    }
-    const findings = rawFindings as string[];
-    const result = await saveReport({ prompt, title, summary, findings });
-    return { value: result, input: title, output: result.message };
+    return { value: result, input: "검색 조건 비공개", output: `${result.count}개 가상 행사 샘플을 찾았습니다.` };
   }
 
   throw new Error(`등록되지 않은 도구입니다: ${name}`);
@@ -114,16 +95,17 @@ export async function runAgent(prompt: string): Promise<AgentRunResult> {
     const outputs: OpenAI.Responses.ResponseInputItem[] = [];
     for (const call of calls) {
       const labels: Record<string, string> = {
-        search_ideas: "아이디어 검색",
-        get_market_info: "시장 자료 조회",
-        save_report: "리포트 저장",
+        search_events: "행사 샘플 검색",
       };
       try {
+        // 자유 입력에 포함될 수 있는 개인정보·키를 로그에 남기지 않는다.
+        console.info(`[step ${round}] ${call.name === "search_events" ? "search_events" : "unknown_tool"}({"arguments":"[비공개]"})`);
         const result = await executeTool(call.name, call.arguments, prompt, context);
+        console.info(`[step ${round}] 도구 완료: ${result.output}`);
         steps.push({ name: call.name, label: labels[call.name] ?? call.name, input: result.input, output: result.output, status: "done" });
-        if (call.name === "save_report") reportSaved = true;
         outputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result.value) });
       } catch (error) {
+        console.error(`[step ${round}] 도구 실행 실패 (인자·오류 원문 비공개)`);
         const message = error instanceof Error ? error.message : "도구 실행에 실패했습니다.";
         steps.push({ name: call.name, label: labels[call.name] ?? call.name, input: "인자 검증", output: message, status: "error" });
         throw new AgentRunError(message, steps);
