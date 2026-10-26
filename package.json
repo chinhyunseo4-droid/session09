@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "check:env": "node scripts/check-env.mjs"
+    "check:env": "node --conditions=react-server scripts/check-env.mjs"
   },
   "engines": { "node": ">=20.9.0" },
   "dependencies": {
